@@ -1,5 +1,6 @@
 # kubernetes
 Kubernetes test projects
+install wordpress with helm ( incloud mysql, phpmyadmin, ... )
 
 -1 create helm chart
 
