@@ -1,0 +1,40 @@
+# values.yaml
+
+wordpress:
+  wordpressUsername: admin
+  wordpressPassword: P@ssw0rd
+  externalDatabase:
+    host: my-mysql
+    user: dbuser
+    password: P@ssw0rd
+    database: wp
+    port: 3306
+  service:
+    type: ClusterIP
+  ingress:
+    enabled: true
+    hostname: wp.mostafa.com
+
+mysql:
+  auth:
+    rootPassword: P@ssw0rd
+    password: P@ssw0rd
+    database: wp
+    username: dbuser
+  service:
+    type: ClusterIP
+  primary:
+    persistence:
+      enabled: true
+
+nginx-ingress:
+  controller:
+    publishService:
+      enabled: true
+
+phpmyadmin:
+  db:
+    host: my-mysql
+  ingress:
+    enabled: true
+    hostname: phpmyadmin.mostafa.com
