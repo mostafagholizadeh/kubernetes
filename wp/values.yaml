@@ -1,0 +1,29 @@
+replicaCount: 1
+
+image:
+  repository: wordpress
+  tag: "5.7.2-php7.4-apache"
+
+mysql:
+  mysqlRootPassword: P@ssw0rd
+  mysqlUser: wordpress
+  mysqlPassword: P@ssw0rd
+  mysqlDatabase: wordpress
+
+phpmyadmin:
+  phpmyAdminPassword: P@ssw0rd
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: true
+  annotations: 
+    nginx.ingress.kubernetes.io/rewrite-target: /
+  hosts: 
+    - host: wordpress.mostafa.com
+      paths: 
+      - path: /
+        pathType: ImplementationSpecific
+
