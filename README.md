@@ -14,9 +14,9 @@ install wordpress with helm ( incloud mysql, phpmyadmin, ... )
 
 -6 config ingress.yaml
 
--7 in helm chart directory use this command for Package the Helm chart: "helm package wordpress-site"
+-7 in helm chart directory use this command for Package the Helm chart: "helm package wp"
 This command will create a .tgz file.
 
--8 Now, you can install the Helm chart with: "helm install wordpress-site ./wordpress-site-1.0.0.tgz"
+-8 Now, you can install the Helm chart with: "helm install wp ./wp-1.0.0.tgz"
 
 -9 check the status of the resources with: kubectl get pods -A
