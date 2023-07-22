@@ -1,0 +1,387 @@
+1-
+Find the pod that consumes the most CPU and store the result to the file /opt/high_cpu_pod in the following format cluster_name,namespace,pod_name.
+The pod could be in any namespace in any of the clusters that are currently configured on the student-node.
+Answer:
+Check out the metrics for all pods across all clusters:
+student-node ~ ➜  kubectl top pods -A --context cluster1 --no-headers | sort -nr -k3 | head -1
+kube-system   kube-apiserver-cluster1-controlplane            30m   258Mi   
+
+student-node ~ ➜  kubectl top pods -A --context cluster2 --no-headers | sort -nr -k3 | head -1
+kube-system   metrics-server-7cd5fcb6b7-fhdrl           5m    18Mi   
+
+student-node ~ ➜  kubectl top pods -A --context cluster3 --no-headers | sort -nr -k3 | head -1
+kube-system   metrics-server-7cd5fcb6b7-zvfrg           5m    18Mi   
+
+student-node ~ ➜  kubectl top pods -A --context cluster4 --no-headers | sort -nr -k3 | head -1
+kube-system   metrics-server-7cd5fcb6b7-zvfrg           5m    18Mi   
+
+student-node ~ ➜ 
+Using this, find the pod that uses most CPU. In this case, it is kube-apiserver-cluster1-controlplane on cluster1.
+
+Save the result in the correct format to the file:
+
+student-node ~ ➜  echo cluster1,kube-system,kube-apiserver-cluster1-controlplane > /opt/high_cpu_pod 
+---------------------------------------------
+2-
+Find the node across all clusters that consumes the most memory and store the result to the file /opt/high_memory_node in the following format cluster_name,node_name.
+The node could be in any clusters that are currently configured on the student-node.
+Answer:
+Check out the metrics for all node across all clusters:
+
+student-node ~ ➜  kubectl top node --context cluster1 --no-headers | sort -nr -k4 | head -1
+cluster1-controlplane   124m   1%    768Mi   1%    
+
+student-node ~ ➜  kubectl top node --context cluster2 --no-headers | sort -nr -k4 | head -1
+cluster2-controlplane   79m   0%    873Mi   1%    
+
+student-node ~ ➜  kubectl top node --context cluster3 --no-headers | sort -nr -k4 | head -1
+cluster3-controlplane   78m   0%    902Mi   1%  
+
+student-node ~ ➜  kubectl top node --context cluster4 --no-headers | sort -nr -k4 | head -1
+cluster4-controlplane   78m   0%    901Mi   1%    
+
+student-node ~ ➜  
+
+
+
+Using this, find the node that uses most memory. In this case, it is cluster3-controlplane on cluster3.
+
+
+Save the result in the correct format to the file:
+
+student-node ~ ➜  echo cluster3,cluster3-controlplane > /opt/high_memory_node 
+----------------
+3-For this question, please set the context to cluster1 by running:
+
+kubectl config use-context cluster1
+
+We have created a service account called blue-sa-cka21-arch, a cluster role called blue-role-cka21-arch and a cluster role binding called blue-role-binding-cka21-arch.
+Update the permissions of this service account so that it can get the pods only in default namespace of cluster1.
+Answer:
+
+Edit the blue-role-cka21-arch to update permissions:
+student-node ~ ➜  kubectl edit clusterrole blue-role-cka21-arch --context cluster1
+
+Under rules: -> - apiGroups: replace apps with ""
+
+resources: replace - deployments with - pods and save the changes.
+
+You can verify it as below:
+
+student-node ~ ➜  kubectl auth can-i get pods --as=system:serviceaccount:default:blue-sa-cka21-arch
+yes
+-------------
+4- The green-deployment-cka15-trb deployment is having some issues since the corresponding POD is crashing and restarting multiple times continuously.
+Investigate the issue and fix it, make sure the POD is in running state and its stable (i.e NO RESTARTS!).
+Answer:
+
+List the pods to check its status
+kubectl get pod
+its must have crashed already so lets look into the logs.
+
+kubectl logs -f green-deployment-cka15-trb-xxxx
+You will see some logs like these
+
+2022-09-18 17:13:25 98 [Note] InnoDB: Mutexes and rw_locks use GCC atomic builtins
+2022-09-18 17:13:25 98 [Note] InnoDB: Memory barrier is not used
+2022-09-18 17:13:25 98 [Note] InnoDB: Compressed tables use zlib 1.2.11
+2022-09-18 17:13:25 98 [Note] InnoDB: Using Linux native AIO
+2022-09-18 17:13:25 98 [Note] InnoDB: Using CPU crc32 instructions
+2022-09-18 17:13:25 98 [Note] InnoDB: Initializing buffer pool, size = 128.0M
+Killed
+This might be due to the resources issue, especially the memory, so let's try to recreate the POD to see if it helps.
+
+kubectl delete pod green-deployment-cka15-trb-xxxx
+Now watch closely the POD status
+
+kubectl get pod
+Pretty soon you will see the POD status has been changed to OOMKilled which confirms its the memory issue. So let's look into the resources that are assigned to this deployment.
+
+kubectl get deploy
+kubectl edit deploy green-deployment-cka15-trb
+Under resources: -> limits: change memory from 256Mi to 512Mi and save the changes.
+Now watch closely the POD status again
+
+kubectl get pod
+It should be stable now.
+--------------------
+5-
+One of the nginx based pod called cyan-pod-cka28-trb is running under cyan-ns-cka28-trb namespace and it is exposed within the cluster using cyan-svc-cka28-trb service.
+This is a restricted pod so a network policy called cyan-np-cka28-trb has been created in the same namespace to apply some restrictions on this pod.
+Two other pods called cyan-white-cka28-trb1 and cyan-black-cka28-trb are also running in the default namespace.
+The nginx based app running on the cyan-pod-cka28-trb pod is exposed internally on the default nginx port (80).
+Expectation: This app should only be accessible from the cyan-white-cka28-trb1 pod.
+Problem: This app is not accessible from anywhere.
+Troubleshoot this issue and fix the connectivity as per the requirement listed above.
+Note: You can exec into cyan-white-cka28-trb and cyan-black-cka28-trb pods and test connectivity using the curl utility.
+You may update the network policy, but make sure it is not deleted from the cyan-ns-cka28-trb namespace.
+Answer:
+
+Let's look into the network policy
+
+kubectl edit networkpolicy cyan-np-cka28-trb -n cyan-ns-cka28-trb
+Under spec: -> egress: you will notice there is not cidr: block has been added, since there is no restrcitions on egress traffic so we can update it as below. Further you will notice that the port used in the policy is 8080 but the app is running on default port which is 80 so let's update this as well (under egress and ingress):
+
+Change port: 8080 to port: 80
+- ports:
+  - port: 80
+    protocol: TCP
+  to:
+  - ipBlock:
+      cidr: 0.0.0.0/0
+Now, lastly notice that there is no POD selector has been used in ingress section but this app is supposed to be accessible from cyan-white-cka28-trb pod under default namespace. So let's edit it to look like as below:
+
+ingress:
+- from:
+  - namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: default
+   podSelector:
+      matchLabels:
+        app: cyan-white-cka28-trb
+Now, let's try to access the app from cyan-white-pod-cka28-trb
+
+kubectl exec -it cyan-white-cka28-trb -- sh
+curl cyan-svc-cka28-trb.cyan-ns-cka28-trb.svc.cluster.local
+Also make sure its not accessible from the other pod(s)
+
+kubectl exec -it cyan-black-cka28-trb -- sh
+curl cyan-svc-cka28-trb.cyan-ns-cka28-trb.svc.cluster.local
+It should not work from this pod. So its looking good now.
+-------------
+6-
+We deployed an app using a deployment called web-dp-cka06-trb. it's using the httpd:latest image. There is a corresponding service called web-service-cka06-trb that exposes this app on the node port 30005. However, the app is not accessible!
+Troubleshoot and fix this issue. Make sure you are able to access the app using curl http://kodekloud-exam.app:30005 command.
+Answer:
+
+List the deployments to see if all PODs under web-dp-cka06-trb deployment are up and running.
+kubectl get deploy
+You will notice that 0 out of 1 PODs are up, so let's look into the POD now.
+
+kubectl get pod
+You will notice that web-dp-cka06-trb-xxx pod is in Pending state, so let's checkout the relevant events.
+
+kubectl get event --field-selector involvedObject.name=web-dp-cka06-trb-xxx
+You should see some error/warning like this:
+
+Warning   FailedScheduling   pod/web-dp-cka06-trb-76b697c6df-h78x4   0/1 nodes are available: 1 persistentvolumeclaim "web-cka06-trb" not found. preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling.
+Let's look into the PVCs
+
+kubectl get pvc
+You should see web-pvc-cka06-trb in the output but as per logs the POD was looking for web-cka06-trb PVC. Let's update the deployment to fix this.
+
+kubectl edit deploy web-dp-cka06-trb
+Under volumes: -> name: web-str-cka06-trb -> persistentVolumeClaim: -> claimName change web-cka06-trb to web-pvc-cka06-trb and save the changes.
+
+Look into the POD again to make sure its running now
+
+kubectl get pod
+You will find that its still failing, most probably with ErrImagePull or ImagePullBackOff error. Now lets update the deployment again to make sure its using the correct image.
+
+kubectl edit deploy web-dp-cka06-trb
+Under spec: -> containers: -> change image from httpd:letest to httpd:latest and save the changes.
+Look into the POD again to make sure its running now
+
+kubectl get pod
+You will notice that POD is still crashing, let's look into the POD logs.
+
+kubectl logs web-dp-cka06-trb-xxxx
+If there are no useful logs then look into the events
+
+kubectl get event --field-selector involvedObject.name=web-dp-cka06-trb-xxxx --sort-by='.lastTimestamp'
+You should see some errors/warnings as below
+
+Warning   FailedPostStartHook   pod/web-dp-cka06-trb-67dccb7487-2bjgf   Exec lifecycle hook ([/bin -c echo 'Test Page' > /usr/local/apache2/htdocs/index.html]) for Container "web-container" in Pod "web-dp-cka06-trb-67dccb7487-2bjgf_default(4dd6565e-7f1a-4407-b3d9-ca595e6d4e95)" failed - error: rpc error: code = Unknown desc = failed to exec in container: failed to start exec "c980799567c8176db5931daa2fd56de09e84977ecd527a1d1f723a862604bd7c": OCI runtime exec failed: exec failed: unable to start container process: exec: "/bin": permission denied: unknown, message: ""
+Let's look into the lifecycle hook of the pod
+
+kubectl edit deploy web-dp-cka06-trb
+Under containers: -> lifecycle: -> postStart: -> exec: -> command: change /bin to /bin/sh
+Look into the POD again to make sure its running now
+
+kubectl get pod
+Finally pod should be in running state. Let's try to access the webapp now.
+
+curl http://kodekloud-exam.app:30005
+You will see error curl: (7) Failed to connect to kodekloud-exam.app port 30005: Connection refused
+Let's look into the service
+
+kubectl edit svc web-service-cka06-trb
+Let's verify if the selector labels and ports are correct as needed. You will note that service is using selector: -> app: web-cka06-trb
+Now, let's verify the app labels:
+
+kubectl get deploy web-dp-cka06-trb -o yaml
+Under labels you will see labels: -> deploy: web-app-cka06-trb
+So we can see that service is using wrong selector label, let's edit the service to fix the same
+
+kubectl edit svc web-service-cka06-trb
+Let's try to access the webapp now.
+
+curl http://kodekloud-exam.app:30005
+Boom! app should be accessible now.
+----------------
+7-
+For this question, please set the context to cluster4 by running:
+kubectl config use-context cluster4
+The controlplane node called cluster4-controlplane in the cluster4 cluster is planned for a regular maintenance. In preparation for this maintenance work, we need to take backups of this cluster. However, something is broken at the moment!
+Troubleshoot the issues and take a snapshot of the ETCD database using the etcdctl utility at the location /opt/etcd-boot-cka18-trb.db.
+Note: Make sure etcd listens at its default port. Also you can SSH to the cluster4-controlplane host using the ssh cluster4-controlplane command from the student-node.
+Answer:
+
+SSH into cluster4-controlplane host.
+ssh cluster4-controlplane
+Let's take etcd backup
+
+ETCDCTL_API=3 etcdctl --endpoints=https://[127.0.0.1]:2379 --cacert=/etc/kubernetes/pki/etcd/ca.crt --cert=/etc/kubernetes/pki/etcd/server.crt --key=/etc/kubernetes/pki/etcd/server.key snapshot save /opt/etcd-boot-cka18-trb.db
+It might stuck for forever, let's see why that would happen. Try to list the PODs first
+
+kubectl get pod -A
+There might an error like
+
+The connection to the server cluster4-controlplane:6443 was refused - did you specify the right host or port?
+There seems to be some issue with the cluster so let's look into the logs
+
+journalctl -u kubelet -f
+You will see a lot of connect: connection refused erros but that must be because the different cluster components are not able to connect to the api server so try to filter out these logs to look more closly
+
+journalctl -u kubelet -f | grep -v 'connect: connection refused'
+You should see some erros as below
+
+cluster4-controlplane kubelet[2240]: E0923 04:38:15.630925    2240 file.go:187] "Could not process manifest file" err="invalid pod: [spec.containers[0].volumeMounts[1].name: Not found: \"etcd-cert\"]" path="/etc/kubernetes/manifests/etcd.yaml"
+So seems like there is some incorrect volume which etcd is trying to mount, let's look into the etcd manifest.
+
+vi /etc/kubernetes/manifests/etcd.yaml 
+Search for etcd-cert, you will notice that the volume name is etcd-certs but the volume mount is trying to mount etcd-cert volume which is incorrect. Fix the volume mount name and save the changes. Let's restart kubelet service after that.
+
+systemctl restart kubelet
+Wait for few minutes to see if its good now.
+
+kubectl get pod -A
+You should be able to list the PODs now, let's try to take etcd backup now:
+
+ETCDCTL_API=3 etcdctl --endpoints=https://[127.0.0.1]:2379 --cacert=/etc/kubernetes/pki/etcd/ca.crt --cert=/etc/kubernetes/pki/etcd/server.crt --key=/etc/kubernetes/pki/etcd/server.key snapshot save /opt/etcd-boot-cka18-trb.db
+It should work now.
+------------------
+7-
+For this question, please set the context to cluster2 by running:
+kubectl config use-context cluster2
+We recently deployed a DaemonSet called logs-cka26-trb under kube-system namespace in cluster2 for collecting logs from all the cluster nodes including the controlplane node. However, at this moment, the DaemonSet is not creating any pod on the controlplane node.
+Troubleshoot the issue and fix it to make sure the pods are getting created on all nodes including the controlplane node.
+Answer:
+Check the status of DaemonSet
+
+kubectl --context2 cluster2 get ds logs-cka26-trb -n kube-system
+You will find that DESIRED CURRENT READY etc have value 2 which means there are two pods that have been created. You can check the same by listing the PODs
+
+kubectl --context2 cluster2 get pod  -n kube-system
+You can check on which nodes these are created on
+
+kubectl --context2 cluster2 get pod <pod-name> -n kube-system -o wide
+Under NODE you will find the node name, so we can see that its not scheduled on the controlplane node which is because it must be missing the reqiured tolerations. Let's edit the DaemonSet to fix the tolerations
+
+kubectl --context2 cluster2 edit ds logs-cka26-trb -n kube-system
+Under tolerations: add below given tolerations as well
+
+- key: node-role.kubernetes.io/control-plane
+  operator: Exists
+  effect: NoSchedule
+Wait for some time PODs should schedule on all nodes now including the controlplane node.
+----------
+8-
+For this question, please set the context to cluster3 by running:
+kubectl config use-context cluster3
+On cluster3, there is a web application pod running inside the default namespace. This pod which is part of a deployment called webapp-color-wl10 and makes use of an environment variable that can change constantly. Add this environment variable to a configmap and configure the pod in the deployment to make use of this config map.
+Use the following specs-
+1. Create a new configMap called webapp-wl10-config-map with the key and value as - APP_COLOR=red.
+2. Update the deployment to make use of the newly created configMap name.
+3. Delete and recreate the deployment if necessary.
+Answer:
+Set the correct context: -
+
+kubectl config use-context cluster3
+
+
+Inspect the given pod in the default namespace: -
+
+kubectl get pods -n default
+
+
+Let's create a new configMap in the default namespace as follows:-
+
+kubectl create configmap webapp-wl10-config-map --from-literal=APP_COLOR=red
+
+
+And now configure the newly created configmap to the web application pod's template: -
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: webapp-color-wl10
+  name: webapp-color-wl10
+  namespace: default
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: webapp-color-wl10
+  template:
+    metadata:
+      labels:
+        app: webapp-color-wl10
+    spec:
+      containers:
+      - image: kodekloud/webapp-color
+        name: webapp-color-wl10
+        envFrom:
+        - configMapRef: 
+            name: webapp-wl10-config-map
+
+
+NOTE: - It will terminate the old pods and will recreate the new pods with configMap.
+
+
+
+You can inspect the newly created pod to check the configMap: -
+
+kubectl describe po webapp-color-wl10-d79c6f76c-4gjmz
+
+
+Note: - In your lab, pod name could be different.
+------------------------
+9-
+For this question, please set the context to cluster3 by running:
+kubectl config use-context cluster3
+A manifest file is available at the /root/app-wl03/ on the student-node node. There are some issues with the file; hence couldn't deploy a pod on the cluster3-controlplane node.
+After fixing the issues, deploy the pod, and it should be in a running state.
+NOTE: - Ensure that the existing limits are unchanged.
+Answer:
+Set the correct context: -
+
+kubectl config use-context cluster3
+
+
+Use the cd command to move to the given directory: -
+
+cd /root/app-wl03/
+While creating the resource, you will see the error output as follows: -
+
+kubectl create -f app-wl03.yaml 
+The Pod "app-wl03" is invalid: spec.containers[0].resources.requests: Invalid value: "1Gi": must be less than or equal to memory limit
+In the spec.containers.resources.requests.memory value is not configured as compare to the memory limit.
+
+As a fix, open the manifest file with the text editor such as vim or nano and set the value to 100Mi or less than 100Mi.
+
+It should be look like as follows: -
+
+resources:
+     requests:
+       memory: 100Mi
+     limits:
+       memory: 100Mi
+Final, create the resource from the kubectl create command: -
+
+kubectl create -f app-wl03.yaml 
+pod/app-wl03 created
+----------
+
